@@ -8,3 +8,6 @@ about="Nuspec CLI tool for awesome people"
 
 [dependencies]
 clap = { version = "4.5.0", features = ["derive"] }
+serde_derive = "1.0"
+serde = "1.0"
+serde-xml-rs = "0.3.1"

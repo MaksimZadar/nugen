@@ -1,4 +1,5 @@
 mod author;
+mod file_loader;
 mod nugen_commands;
 mod version;
 use author::handle_author_commands;

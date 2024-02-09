@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 
-use crate::{version::VersionSubCommands, AuthorSubCommands};
+use crate::author::AuthorSubCommands;
+use crate::version::VersionSubCommands;
 
 #[derive(Parser, Debug)]
 #[command(name = "Nugen")]
@@ -8,11 +9,6 @@ use crate::{version::VersionSubCommands, AuthorSubCommands};
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
-
-    /// By default will look in CWD for a Nuspec,
-    /// but you can specify a custom path with this flag
-    #[arg(long, short)]
-    pub file: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]

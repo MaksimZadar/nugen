@@ -9,6 +9,6 @@ pub enum AuthorSubCommands {
 
 pub fn handle_author_commands(command: &AuthorSubCommands) {
     match command {
-        AuthorSubCommands::Set { author_name } => println!("{}", author_name),
+        AuthorSubCommands::Set { author_name } => {}
     }
 }

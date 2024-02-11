@@ -1,41 +1,122 @@
+use glob::glob;
+use quick_xml::se::to_string;
+use serde_derive::{Deserialize, Serialize};
 use std::{
-    fs::{self, File, OpenOptions},
-    io::{BufReader, Read},
+    fs::{File, OpenOptions},
+    io::{Read, Seek, SeekFrom, Write},
+    os::windows::fs::FileExt,
 };
 
-use serde_derive::Deserialize;
+#[derive(Debug)]
+pub struct NuspecInfo {
+    pub info: Package,
+    pub file: File,
+}
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "kebab-case", rename = "package")]
 pub struct Package {
-    metadata: Metadata,
+    #[serde(rename = "@xmlns")]
+    pub xmlns: String,
+    pub metadata: Metadata,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "kebab-case")]
 pub struct Metadata {
-    id: String,
-    version: String,
-    description: String,
-    authors: String,
+    pub id: String,
+    pub version: String,
+    pub description: String,
+    pub authors: String,
 }
 
-const NS: &'static str = "http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd";
+#[derive(Debug)]
+pub enum FileOperationErrors {
+    NoNuspecFound,
+    FailedToOpenFile,
+    FailedToReadFileToBuffer,
+    FailedToDeserialize,
+    FailedToSerialize,
+    FailedToWriteToFile,
+    CouldNotClearFile,
+    FailedToRewindToStartOfFile,
+}
 
-pub fn read_file(file_path: &String) -> Package {
-    let mut file = OpenOptions::new()
+pub fn get_nuspec_info(file: &mut File) -> Result<Package, FileOperationErrors> {
+    let mut file_buff: String = String::new();
+
+    match file.read_to_string(&mut file_buff) {
+        Ok(_) => {}
+        Err(_) => return Err(FileOperationErrors::FailedToReadFileToBuffer),
+    };
+
+    let package: Package = match quick_xml::de::from_str(&file_buff) {
+        Ok(p) => p,
+        Err(_) => return Err(FileOperationErrors::FailedToDeserialize),
+    };
+
+    return Ok(package);
+}
+
+pub fn open_nuspec_file(file_path: &Option<String>) -> Result<File, FileOperationErrors> {
+    // Set default file path string
+    let file_path = match &file_path {
+        Some(path) => path,
+        None => "./*.nuspec",
+    };
+
+    let mut paths = match glob(file_path) {
+        Ok(p) => p,
+        Err(_) => return Err(FileOperationErrors::NoNuspecFound),
+    };
+
+    // Get first file result
+    let binding = paths.nth(0);
+    let first_file_result = match &binding {
+        Some(f) => f,
+        None => return Err(FileOperationErrors::NoNuspecFound),
+    };
+
+    let first_file = match first_file_result {
+        Ok(f) => f,
+        Err(_) => return Err(FileOperationErrors::NoNuspecFound),
+    };
+
+    // Open the file
+    let file = match OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
-        .open(file_path)
-        .expect("Could not open file!");
-
-    let mut file_str: String = String::new();
-    match file.read_to_string(&mut file_str) {
-        Ok(_) => println!("Success"),
-        Err(_) => println!("Fail"),
+        .open(first_file)
+    {
+        Ok(f) => f,
+        Err(_) => return Err(FileOperationErrors::FailedToOpenFile),
     };
 
-    let package: Package =
-        serde_xml_rs::from_str(file_str.as_mut_str()).expect("Something went wrong deserializing");
+    return Ok(file);
+}
 
-    return package;
+pub fn save_nuspec_file(mut nuspec_file: NuspecInfo) -> Result<(), FileOperationErrors> {
+    let new_content = match to_string(&nuspec_file.info) {
+        Ok(c) => c,
+        Err(_) => return Err(FileOperationErrors::FailedToSerialize),
+    };
+
+    match nuspec_file.file.set_len(38) {
+        Ok(_) => {}
+        Err(_) => return Err(FileOperationErrors::CouldNotClearFile),
+    };
+
+    match nuspec_file.file.seek(SeekFrom::End(0)) {
+        Ok(_) => {}
+        Err(_) => return Err(FileOperationErrors::FailedToRewindToStartOfFile),
+    };
+
+    match nuspec_file.file.write_all(new_content.as_bytes()) {
+        Ok(_) => {}
+        Err(_) => return Err(FileOperationErrors::FailedToWriteToFile),
+    };
+
+    println!("{}", new_content);
+    return Ok(());
 }

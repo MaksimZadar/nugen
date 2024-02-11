@@ -4,7 +4,6 @@ use serde_derive::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
     io::{Read, Seek, SeekFrom, Write},
-    os::windows::fs::FileExt,
 };
 
 #[derive(Debug)]
